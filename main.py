@@ -97,4 +97,4 @@ def analyze_match(msg):
         bot.send_message(msg.chat.id, f"❌ Error: {e}")
 
 # === Polling ===
-bot.polling(none_stop=Tr
+bot.polling(none_stop=True)
