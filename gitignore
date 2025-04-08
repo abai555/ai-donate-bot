@@ -1,9 +1,4 @@
 __pycache__/
 *.pyc
 .env
-venv/
-.envrc
-.DS_Store
-*.log
-*.sqlite3
 *.db
