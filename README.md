@@ -1,14 +1,12 @@
 # AI Match Analyzer Bot
 
-A Telegram bot that uses AI (Groq) to analyze football matches and provide predictions.  
-Access is granted via donations — either to a MIR bank card or a crypto wallet.
+AI-powered Telegram bot for match predictions using Groq.  
+Manual payments (MIR card or crypto) are required for access.
 
-## Features:
-- Match analysis powered by AI (Groq)
-- Access via donation (MIR card or crypto)
-- Runs 24/7 on Railway
+## Features
+- AI-based predictions via Groq API
+- Manual payment verification
+- 4 subscription plans (one-time, weekly, monthly, yearly)
 
-## How to use:
-1. Send /start in the Telegram bot
-2. Choose your subscription type
-3. Send your donation and get full access
+## Deployment
+Compatible with Railway / Render
