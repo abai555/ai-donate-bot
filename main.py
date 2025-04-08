@@ -40,22 +40,17 @@ conn.commit()
 @bot.message_handler(commands=['start'])
 def start(message):
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.row("🔍 Analyze Match", "💳 Donate & Get Access")
+    markup.add("🔍 Analyze Match", "💳 Donate & Get Access")
+    
     bot.send_message(
         message.chat.id,
-        "🤖 <b>AI Match Analyzer</b>
-
-"
-        "Analyze matches using AI and Groq.
-
-"
-        "🔹 Features:
-"
-        "- Smart predictions
-"
-        "- Pay via MIR card or crypto
-"
-        "- Subscriptions: Weekly / Monthly / Yearly",
+        "<b>🤖 AI Match Analyzer</b> — an AI-powered match analysis bot.\n\n"
+        "♦️ <b>Features:</b>\n"
+        "- Analyze matches using AI and Groq.\n"
+        "- Get predictions\n"
+        "- Pay via MIR card or crypto\n"
+        "- Subscriptions: Weekly / Monthly / Yearly.\n\n"
+        "👇 Press the button to start analyzing!",
         parse_mode="HTML",
         reply_markup=markup
     )
