@@ -3,6 +3,7 @@ import sqlite3
 from flask import Flask
 from threading import Thread
 from groq import Groq
+import datetime
 
 # === CONFIG ===
 TELEGRAM_TOKEN = "7710632976:AAEf3KbdDQ8lV6LAR8A2iRKGNcIFbrUQa8A"
@@ -34,9 +35,16 @@ CREATE TABLE IF NOT EXISTS users (
 """)
 conn.commit()
 
+# === Logging Function ===
+def log_message(user_id, username, message):
+    time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open("bot_message_log.txt", "a", encoding="utf-8") as log_file:
+        log_file.write(f"[{time}] {user_id} ({username}): {message}\n")
+
 # === /start ===
 @bot.message_handler(commands=['start'])
 def start(message):
+    log_message(message.chat.id, message.from_user.username, "/start")
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row("🔍 Analyze Match", "💳 Donate & Get Access")
     bot.send_message(
@@ -56,6 +64,7 @@ def start(message):
 # === Donate & Access ===
 @bot.message_handler(func=lambda msg: msg.text == "💳 Donate & Get Access")
 def donate_info(msg):
+    log_message(msg.chat.id, msg.from_user.username, "💳 Donate & Get Access")
     markup = telebot.types.InlineKeyboardMarkup()
     markup.add(telebot.types.InlineKeyboardButton("✅ I Paid", callback_data="paid"))
     bot.send_message(
@@ -72,6 +81,7 @@ def donate_info(msg):
 @bot.callback_query_handler(func=lambda call: call.data == "paid")
 def paid_submitted(call):
     uid = call.message.chat.id
+    log_message(uid, call.from_user.username, "Pressed I Paid")
     bot.send_message(uid, "🕓 Payment submitted. Please wait for confirmation.")
     bot.send_message(ADMIN_ID,
         f"🧾 <b>New payment request</b>\n"
@@ -95,13 +105,16 @@ def admin_confirm(call):
         conn.commit()
         bot.send_message(uid, "✅ Access granted! You can now analyze matches.")
         bot.send_message(call.message.chat.id, "Access confirmed.")
+        log_message(uid, "admin", "Access granted")
     else:
         bot.send_message(uid, "❌ Access denied. Please make sure you paid.")
         bot.send_message(call.message.chat.id, "Access rejected.")
+        log_message(uid, "admin", "Access denied")
 
 # === Match Button ===
 @bot.message_handler(func=lambda msg: msg.text == "🔍 Analyze Match")
 def analyze_check(msg):
+    log_message(msg.chat.id, msg.from_user.username, "Clicked Analyze Match")
     uid = msg.chat.id
     cursor.execute("SELECT access FROM users WHERE user_id=?", (uid,))
     row = cursor.fetchone()
@@ -113,6 +126,7 @@ def analyze_check(msg):
 # === Actual Analysis ===
 @bot.message_handler(func=lambda msg: True)
 def analyze_match(msg):
+    log_message(msg.chat.id, msg.from_user.username, msg.text)
     uid = msg.chat.id
     cursor.execute("SELECT access FROM users WHERE user_id=?", (uid,))
     row = cursor.fetchone()
@@ -161,5 +175,6 @@ Now analyze this match:\n{msg.text}
             bot.send_message(uid, answer[part:part+4000])
     except Exception as e:
         bot.send_message(uid, f"❌ Error:\n{e}")
+        log_message(uid, "error", str(e))
 
 bot.polling()
