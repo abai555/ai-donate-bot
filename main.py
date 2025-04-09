@@ -6,7 +6,7 @@ from groq import Groq
 import datetime
 
 # === CONFIG ===
-TELEGRAM_TOKEN = "7710632976:AAEf3KbdDQ8lV6LAR8A2iRKGNcIFbrUQa8A"
+TELEGRAM_TOKEN = "7740303549:AAEbHCT-e9scnxi8XNMp6zwXjutAcBMuvJk"
 GROQ_API_KEY = "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"
 ADMIN_ID = 1023932092  # Replace with your Telegram ID
 CRYPTO_ADDRESS = "TH92J3hUqbAgpXiC5NtkxFHGe2vB9yUonH"
