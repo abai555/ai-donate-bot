@@ -1,12 +1,21 @@
-# AI Match Analyzer Bot
+# AI Match Analyzer Telegram Bot
 
-AI-powered Telegram bot for match predictions using Groq.  
-Manual payments (MIR card or crypto) are required for access.
+A Telegram bot that uses AI (Groq + LLaMA3) to generate match predictions based on user input.
 
 ## Features
-- AI-based predictions via Groq API
-- Manual payment verification
-- 4 subscription plans (one-time, weekly, monthly, yearly)
+- Football match analysis using Groq AI
+- Manual payment confirmation system
+- Subscription access (One-time / Weekly / Monthly / Yearly)
+- Built-in access control with SQLite
+- Flask server to keep bot alive on platforms like Railway
 
-## Deployment
-Compatible with Railway / Render
+## Setup
+1. Clone the repository
+2. Add your `TELEGRAM_TOKEN` and `GROQ_API_KEY`
+3. Deploy to Railway or any 24/7 host
+
+## Pricing (for users)
+- One-time: $5
+- Weekly: $25
+- Monthly: $65
+- Yearly: $390
