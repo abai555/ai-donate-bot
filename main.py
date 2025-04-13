@@ -3,7 +3,7 @@ import sqlite3
 import os
 from flask import Flask
 from threading import Thread
-from groq import Groq
+from groq import GroqClient
 from datetime import datetime, timedelta
 
 # === CONFIG ===
