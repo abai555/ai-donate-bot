@@ -1,9 +1,9 @@
+import os
 import telebot
 import sqlite3
 from flask import Flask
 from threading import Thread
 from groq import Groq
-import os
 
 # === CONFIG ===
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -15,7 +15,7 @@ CRYPTO_ADDRESS = os.getenv("CRYPTO_ADDRESS")
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 client = Groq(api_key=GROQ_API_KEY)
 
-# === Flask uptime ===
+# === Flask Uptime ===
 app = Flask(__name__)
 @app.route('/')
 def home():
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
 """)
 conn.commit()
 
-# === /start ===
+# === /start Command ===
 @bot.message_handler(commands=['start'])
 def start(message):
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -64,7 +64,7 @@ def donate_info(msg):
         reply_markup=markup
     )
 
-# === Payment Confirmation ===
+# === Confirm Payment ===
 @bot.callback_query_handler(func=lambda call: call.data == "paid")
 def confirm_payment(call):
     uid = call.message.chat.id
@@ -77,7 +77,7 @@ def confirm_payment(call):
         ])
     )
 
-# === Admin Actions ===
+# === Admin Approval ===
 @bot.callback_query_handler(func=lambda call: call.data.startswith("grant_") or call.data.startswith("reject_"))
 def handle_admin_action(call):
     uid = int(call.data.split("_")[1])
@@ -92,7 +92,7 @@ def handle_admin_action(call):
         bot.send_message(uid, "❌ Access denied.")
         bot.send_message(call.message.chat.id, "Access rejected.")
 
-# === Analyze Match button ===
+# === Analyze Match Button ===
 @bot.message_handler(func=lambda msg: msg.text == "🔍 Analyze Match")
 def match_entry(msg):
     cursor.execute("SELECT access FROM users WHERE user_id=?", (msg.chat.id,))
@@ -102,42 +102,37 @@ def match_entry(msg):
     else:
         bot.send_message(msg.chat.id, "❌ Access denied. Use 💳 Donate & Get Access first.")
 
-# === Handle Match Text ===
+# === Match Analysis ===
 @bot.message_handler(func=lambda msg: True)
 def analyze(msg):
     cursor.execute("SELECT access FROM users WHERE user_id=?", (msg.chat.id,))
     access = cursor.fetchone()
     if not access or access[0] != 1:
         return
-
-    bot.send_message(msg.chat.id, "⚡ Анализирую матч...")
-
+    bot.send_message(msg.chat.id, "⚡ Analyzing...")
     try:
         prompt = f"""
-Ты — опытный каппер. Дай краткий прогноз строго в таком формате, на русском языке:
+Ты — спортивный аналитик ИИ. Ответь строго на русском языке в этом формате:
 
-Match: [Название турнира — команды]  
-Дополнительный контекст матча: [Например, "Ответный матч, первая игра 0:3 в пользу Арсенала"]  
-Место: [Стадион, Город]
+Match: Лига чемпионов — Реал Мадрид против Арсенала.  
+Ответный матч, первая игра закончилась 0:3 в пользу Арсенала.  
+Матч пройдет на Сантьяго Бернабеу, Мадрид.
 
 Прогноз:
+• Основная ставка: [например, Победа Реала Мадрида]
+• Уверенность: [например, Высокая]
+• Дополнительная Ставка: [например, Тотал больше 2.5]
 
-• Основная ставка: [Например, Победа Реала / Обе забьют / Тотал больше 2.5]  
-• Уверенность: [Низкая / Средняя / Высокая / Очень высокая]  
-• Дополнительная Ставка: [Пример: Арсенал забьет / Более 2.5 голов / Реал не пропустит]
-
-Контекст матча: {msg.text}
+Теперь проанализируй: {msg.text}
 """
-
         response = client.chat.completions.create(
             model="llama3-70b-8192",
             messages=[{"role": "user", "content": prompt}]
         )
-
         answer = response.choices[0].message.content
-
         for chunk in range(0, len(answer), 4000):
             bot.send_message(msg.chat.id, answer[chunk:chunk+4000])
-
     except Exception as e:
-        bot.send_message(msg.chat.id, f"Произошла ошибка:\n{e}")
+        bot.send_message(msg.chat.id, f"Ошибка:\n{e}")
+
+bot.polling()
