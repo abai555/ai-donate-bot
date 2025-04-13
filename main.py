@@ -113,18 +113,36 @@ def analyze(msg):
     bot.send_message(msg.chat.id, "⚡ Analyzing match...")
     try:
         prompt = f"""
-Act as an expert football analyst. Based on match data, generate a realistic betting prediction.
+Ты профессиональный футбольный аналитик. Всегда отвечай строго по следующему шаблону, без лишнего текста:
 
-Match: {msg.text}
+Матч: [Название матча]  
+Стадия: [Стадия турнира]  
+Место: [Город, стадион]  
 
-Respond in this format:
+—
 
-Match: {msg.text}
-Prediction:
-• Main Bet: [e.g. Total Over 2.5 / Handicap +1.5 / Team A to Win]
-• Confidence: [Low / Medium / High]
-• Extra Bet (if any): [Optional]
-Only return football-related predictions. Avoid unrealistic scores.
+Ключевые факторы:  
+• [Фактор 1]  
+• [Фактор 2]  
+• [Фактор 3]  
+• [Фактор 4]  
+• [Фактор 5]  
+
+—
+
+Прогноз:  
+• Ставка: [например: победа, тотал больше, обе забьют]  
+• Счет: [например: 2:1]  
+• Уверенность: [Низкая / Средняя / Высокая / Очень высокая]  
+
+—
+
+Альтернативный экспресс (коэффициент 3+):  
+• [Ставка 1]  
+• [Ставка 2]  
+• [Ставка 3]
+
+Теперь проанализируй: {msg.text}
 """
         response = client.chat.completions.create(
             model="llama3-70b-8192",
