@@ -1,20 +1,34 @@
+import os
 import telebot
 import sqlite3
+from flask import Flask
+from threading import Thread
 from groq import Groq
-import os
 
 # === CONFIG ===
-TELEGRAM_TOKEN = os.getenv("7241781324:AAFOgQ8QgTiCOC1efBUoPeu7UzM7Yu2UXvo")
-GROQ_API_KEY = os.getenv("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")
-ADMIN_ID = int(os.getenv("1023932092"))
-MIR_CARD = os.getenv("2200701901154812")
-CRYPTO_ADDRESS = os.getenv("TH92J3hUqbAgpXiC5NtkxFHGe2vB9yUonH")
+telegram_token = os.getenv("7241781324:AAFOgQ8QgTiCOC1efBUoPeu7UzM7Yu2UXvo")
+groq_api_key = os.getenv("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")
+crypto_address = os.getenv("TH92J3hUqbAgpXiC5NtkxFHGe2vB9yUonH")
+mir_card = os.getenv("2200701901154812")
 
-# === INIT ===
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
-client = Groq(api_key=GROQ_API_KEY)
+admin_id_str = os.getenv("1023932092")
+if not admin_id_str:
+    raise ValueError("ADMIN_ID not set in environment variables")
+ADMIN_ID = int(admin_id_str)
 
-# === DATABASE ===
+bot = telebot.TeleBot(telegram_token)
+client = Groq(api_key=groq_api_key)
+
+# === Flask Uptime ===
+app = Flask(__name__)
+@app.route('/')
+def home():
+    return "Bot is alive!"
+def run():
+    app.run(host="0.0.0.0", port=8080)
+Thread(target=run).start()
+
+# === База данных ===
 conn = sqlite3.connect("users.db", check_same_thread=False)
 cursor = conn.cursor()
 cursor.execute("""
