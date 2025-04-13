@@ -13,7 +13,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 MIR_CARD = os.getenv("2200701901154812")
 CRYPTO_ADDRESS = os.getenv("TH92J3hUqbAgpXiC5NtkxFHGe2vB9yUonH")
 
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 client = Groq(api_key=GROQ_API_KEY)
 
 # === Flask uptime ===
