@@ -20,7 +20,9 @@ admin_id_raw = os.getenv("ADMIN_ID")
 if admin_id_raw is None:
     raise ValueError("ADMIN_ID is not set in environment variables")
 ADMIN_ID = int(admin_id_raw)
-bot = TeleBot(TELEGRAM_TOKEN)
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+if TELEGRAM_TOKEN is None:
+    raise ValueError("TELEGRAM_TOKEN is not set in environment variables")
 client = Groq(api_key=GROQ_API_KEY)
 
 # === Flask App for Railway Uptime ===
