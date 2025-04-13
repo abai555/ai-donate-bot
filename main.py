@@ -109,48 +109,53 @@ def analyze(msg):
     access = cursor.fetchone()
     if not access or access[0] != 1:
         return
-    bot.send_message(msg.chat.id, "⚡ Analyzing...")
+
+    bot.send_message(msg.chat.id, "⚡ Анализирую матч...")
+
     try:
         prompt = f"""
-You are an AI football analyst. Return your response in this format:
+Ты — профессиональный футбольный аналитик. Проанализируй матч строго по следующей структуре:
 
-Match: [Match Name]
-Stage: [Stage]
-Location: [City, Stadium]
-
-—
-
-Key Factors:
-• Bullet 1
-• Bullet 2
-• Bullet 3
-• Bullet 4
-• Bullet 5
+Матч: [Название матча]  
+Стадия: [Стадия турнира]  
+Место: [Город, стадион]
 
 —
 
-Prediction:
-• Outcome: [e.g. Both teams to score / Team wins]
-• Score: [e.g. 2:1]
-• Confidence: [Low/Medium/High/Very High]
+Ключевые факторы:  
+• Фактор 1  
+• Фактор 2  
+• Фактор 3  
+• Фактор 4  
+• Фактор 5
 
 —
 
-Alternative Express Bet (3+ odds):
-• Bet 1
-• Bet 2
-• Bet 3
+Прогноз:  
+• Исход: [Например, Победа Реала / Обе забьют]  
+• Счёт: [2:1]  
+• Уверенность: [Низкая / Средняя / Высокая / Очень высокая]
 
-Now analyze: {msg.text}
+—
+
+Альтернативный экспресс (коэффициент 3+):  
+• Ставка 1  
+• Ставка 2  
+• Ставка 3
+
+Контекст матча: {msg.text}
 """
+
         response = client.chat.completions.create(
             model="llama3-70b-8192",
             messages=[{"role": "user", "content": prompt}]
         )
+
         answer = response.choices[0].message.content
+
         for chunk in range(0, len(answer), 4000):
             bot.send_message(msg.chat.id, answer[chunk:chunk+4000])
-    except Exception as e:
-        bot.send_message(msg.chat.id, f"Error:\n{e}")
 
+    except Exception as e:
+        bot.send_message(msg.chat.id, f"Произошла ошибка:\n{e}")
 bot.polling()
