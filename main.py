@@ -114,35 +114,25 @@ def analyze_match(msg):
 
     try:
         prompt = f"""
-You are a football betting expert. Predict this match using a realistic betting style.
-Only suggest safe bets like:
-- Over/Under goals
-- Handicap
-- Both Teams to Score
-- Draw No Bet
-- Double Chance
-
-Avoid unrealistic or crazy scorelines.
-
-Respond in this format:
+You are a betting AI. Provide a realistic football prediction using only this format:
 
 Match: [Team A vs Team B]  
-Tournament: [Competition Name]  
-Date: [Expected Date]
+Tournament: [Tournament Name]  
+Date: [Approximate Date]
 
 —
 
 Prediction:  
-• Bet: [Example: Over 2.5 goals]  
-• Odds: ~[1.70–2.20]  
-• Confidence: [Low / Medium / High]
+• Bet: [e.g. Over 2.5 goals / Both Teams to Score]  
+• Odds: ~[Approx. odds like 1.80]  
+• Confidence: [High / Medium / Low]
 
 —
 
 Reasoning:
-• Key factor 1  
-• Key factor 2  
-• Key factor 3
+• 1 short fact  
+• 2nd short fact  
+• 3rd short fact
 
 Match: {msg.text}
 """
