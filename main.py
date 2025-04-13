@@ -16,7 +16,10 @@ MIR_CARD = os.getenv("2200701901154812")
 if not TELEGRAM_TOKEN or not GROQ_API_KEY or not ADMIN_ID:
     print("Warning: One or more environment variables are missing.")
 
-ADMIN_ID = int(ADMIN_ID)
+admin_id_raw = os.getenv("ADMIN_ID")
+if admin_id_raw is None:
+    raise ValueError("ADMIN_ID is not set in environment variables")
+ADMIN_ID = int(admin_id_raw)
 bot = TeleBot(TELEGRAM_TOKEN)
 client = Groq(api_key=GROQ_API_KEY)
 
