@@ -1,165 +1,131 @@
 import os
-import telebot
 import sqlite3
 from flask import Flask
 from threading import Thread
+from telebot import TeleBot, types
 from groq import Groq
 
-# === CONFIG ===
-telegram_token = os.getenv("7241781324:AAFOgQ8QgTiCOC1efBUoPeu7UzM7Yu2UXvo")
-groq_api_key = os.getenv("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")
-crypto_address = os.getenv("TH92J3hUqbAgpXiC5NtkxFHGe2vB9yUonH")
-mir_card = os.getenv("2200701901154812")
+# === ENV CONFIG ===
+TELEGRAM_TOKEN = os.getenv("7241781324:AAFOgQ8QgTiCOC1efBUoPeu7UzM7Yu2UXvo")
+GROQ_API_KEY = os.getenv("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")
+ADMIN_ID = os.getenv("1023932092")
+CRYPTO_ADDRESS = os.getenv("TH92J3hUqbAgpXiC5NtkxFHGe2vB9yUonH")
+MIR_CARD = os.getenv("2200701901154812")
 
-admin_id_str = os.getenv("1023932092")
-if not admin_id_str:
-    raise ValueError("ADMIN_ID not set in environment variables")
-ADMIN_ID = int(admin_id_str)
+if not all([TELEGRAM_TOKEN, GROQ_API_KEY, ADMIN_ID]):
+    raise ValueError("TELEGRAM_TOKEN, GROQ_API_KEY, ADMIN_ID must be set in environment variables")
 
-bot = telebot.TeleBot(telegram_token)
-client = Groq(api_key=groq_api_key)
+bot = TeleBot(TELEGRAM_TOKEN)
+client = Groq(api_key=GROQ_API_KEY)
 
-# === Flask Uptime ===
+# === Flask App for Railway Uptime ===
 app = Flask(__name__)
-@app.route('/')
+@app.route("/")
 def home():
-    return "Bot is alive!"
-def run():
-    app.run(host="0.0.0.0", port=8080)
-Thread(target=run).start()
+    return "Bot is live!"
 
-# === База данных ===
+Thread(target=lambda: app.run(host="0.0.0.0", port=8080)).start()
+
+# === SQLite Users DB ===
 conn = sqlite3.connect("users.db", check_same_thread=False)
 cursor = conn.cursor()
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    user_id INTEGER PRIMARY KEY,
-    access INTEGER DEFAULT 0
-)
-""")
+cursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, access INTEGER DEFAULT 0)")
 conn.commit()
 
-# === /start ===
+# === Start ===
 @bot.message_handler(commands=['start'])
-def start(message):
-    kb = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add("🔍 Analyze Match", "💳 Donate & Get Access")
-    bot.send_message(message.chat.id,
+def start(msg):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("🔍 Analyze Match", "💳 Donate & Get Access")
+    bot.send_message(
+        msg.chat.id,
         "<b>🤖 AI Match Analyzer</b>\n\n"
-        "Predict football matches using powerful AI.\n"
-        "Access is granted after one-time or subscription donation.\n\n"
-        "<b>Pricing:</b>\n"
-        "• One-time: $5\n"
-        "• Weekly: $25\n"
-        "• Monthly: $65\n"
-        "• Yearly: $390",
-        parse_mode="HTML", reply_markup=kb
+        "Predict matches using AI.\n"
+        "Access requires donation:\n"
+        "• One-time – $5\n"
+        "• Weekly – $25\n"
+        "• Monthly – $65\n"
+        "• Yearly – $390",
+        parse_mode="HTML",
+        reply_markup=markup
     )
 
-# === Donate Info ===
-@bot.message_handler(func=lambda m: m.text == "💳 Donate & Get Access")
-def donate_info(msg):
-    kb = telebot.types.InlineKeyboardMarkup()
-    kb.add(telebot.types.InlineKeyboardButton("✅ I Paid", callback_data="paid"))
-    bot.send_message(msg.chat.id,
-        f"<b>Send your donation to:</b>\n\n"
-        f"💳 MIR Card:\n<code>{MIR_CARD}</code>\n\n"
-        f"🪙 USDT (TRC20):\n<code>{CRYPTO_ADDRESS}</code>\n\n"
-        "After sending, click '✅ I Paid'. Access is approved manually.",
-        parse_mode="HTML", reply_markup=kb
+# === Donate Button ===
+@bot.message_handler(func=lambda msg: msg.text == "💳 Donate & Get Access")
+def donate(msg):
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("✅ I Paid", callback_data="paid"))
+    bot.send_message(
+        msg.chat.id,
+        f"Send payment to:\n\n"
+        f"💳 MIR: <code>{MIR_CARD}</code>\n"
+        f"🪙 USDT (TRC20): <code>{CRYPTO_ADDRESS}</code>\n\n"
+        "Then press '✅ I Paid'. Access will be granted after approval.",
+        parse_mode="HTML",
+        reply_markup=markup
     )
 
-# === Handle Payment Request ===
+# === Manual Payment Confirmation ===
 @bot.callback_query_handler(func=lambda call: call.data == "paid")
-def handle_paid(call):
-    uid = call.message.chat.id
-    bot.send_message(uid, "🕓 Payment sent. Waiting for admin approval.")
-    bot.send_message(ADMIN_ID,
-        f"🧾 Payment request from @{call.from_user.username or 'no username'} (ID: {uid})",
-        reply_markup=telebot.types.InlineKeyboardMarkup([
-            [telebot.types.InlineKeyboardButton("✅ Grant", callback_data=f"grant_{uid}"),
-             telebot.types.InlineKeyboardButton("❌ Reject", callback_data=f"reject_{uid}")]
-        ])
+def check_payment(call):
+    uid = call.from_user.id
+    bot.send_message(uid, "🕓 Waiting for confirmation...")
+    bot.send_message(
+        int(ADMIN_ID),
+        f"🧾 New request\nUser: @{call.from_user.username} ({uid})\n\nGrant access?",
+        reply_markup=types.InlineKeyboardMarkup([
+            [types.InlineKeyboardButton("✅ Grant", callback_data=f"grant_{uid}"),
+             types.InlineKeyboardButton("❌ Reject", callback_data=f"reject_{uid}")]
+        ]),
+        parse_mode="HTML"
     )
 
-# === Admin Grant/Reject ===
-@bot.callback_query_handler(func=lambda c: c.data.startswith("grant_") or c.data.startswith("reject_"))
+@bot.callback_query_handler(func=lambda call: call.data.startswith("grant_") or call.data.startswith("reject_"))
 def handle_admin_decision(call):
-    if call.from_user.id != ADMIN_ID:
+    if str(call.from_user.id) != str(ADMIN_ID):
         return
     uid = int(call.data.split("_")[1])
     if call.data.startswith("grant_"):
         cursor.execute("INSERT OR REPLACE INTO users (user_id, access) VALUES (?, 1)", (uid,))
         conn.commit()
-        bot.send_message(uid, "✅ Access granted. You can now analyze matches.")
+        bot.send_message(uid, "✅ Access granted.")
+        bot.send_message(call.message.chat.id, "User confirmed.")
     else:
-        bot.send_message(uid, "❌ Access denied. Please check your payment.")
-    bot.send_message(call.message.chat.id, "✔️ Processed.")
+        bot.send_message(uid, "❌ Access denied.")
+        bot.send_message(call.message.chat.id, "User rejected.")
 
-# === Check Access for Analysis ===
-@bot.message_handler(func=lambda m: m.text == "🔍 Analyze Match")
-def check_access(msg):
+# === Match Prediction ===
+@bot.message_handler(func=lambda msg: msg.text == "🔍 Analyze Match")
+def ask_match(msg):
     uid = msg.chat.id
     cursor.execute("SELECT access FROM users WHERE user_id=?", (uid,))
-    row = cursor.fetchone()
-    if row and row[0] == 1:
-        bot.send_message(uid, "✅ Send the match details (teams, tournament, etc).")
+    access = cursor.fetchone()
+    if access and access[0] == 1:
+        bot.send_message(uid, "Send the match details (teams, stage, etc.):")
     else:
-        bot.send_message(uid, "❌ Access denied. Please donate first.")
+        bot.send_message(uid, "❌ Access denied. Please click 'Donate & Get Access'.")
 
-# === Analyze Match (Groq AI) ===
-@bot.message_handler(func=lambda m: True)
+@bot.message_handler(func=lambda msg: True)
 def analyze(msg):
     uid = msg.chat.id
     cursor.execute("SELECT access FROM users WHERE user_id=?", (uid,))
-    row = cursor.fetchone()
-    if not row or row[0] != 1:
+    access = cursor.fetchone()
+    if not access or access[0] != 1:
         return
-    bot.send_message(uid, "⚡ Analyzing match...")
 
     prompt = f"""
-You are a football betting expert. Predict the following match using safe, high-probability betting tips.
-
-Only suggest realistic outcomes:
-- Over/Under goals
-- Both Teams to Score
-- Handicap
-- Draw No Bet
-- Double Chance
-
-Don't invent crazy scorelines.
-
-Reply in this format:
-
-Match: [Teams]  
-Tournament: [Name]  
-Date: [Approximate Date]
-
-—
-
-Prediction:
-• Bet: [Bet type]
-• Odds: ~1.70–2.20
-• Confidence: Low / Medium / High
-
-—
-
-Reasoning:
-• Short fact 1
-• Short fact 2
-• Short fact 3
+You are a football analyst. Generate a safe and realistic prediction for this match with betting tips (winner, total, handicap).
 
 Match: {msg.text}
 """
-
     try:
+        bot.send_message(uid, "⚡ Analyzing match...")
         response = client.chat.completions.create(
             model="llama3-70b-8192",
             messages=[{"role": "user", "content": prompt}]
         )
-        result = response.choices[0].message.content
-        for chunk in range(0, len(result), 4000):
-            bot.send_message(uid, result[chunk:chunk+4000])
+        answer = response.choices[0].message.content
+        bot.send_message(uid, answer[:4096])
     except Exception as e:
         bot.send_message(uid, f"❌ Error:\n{e}")
 
