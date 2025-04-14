@@ -14,7 +14,7 @@ MIR_CARD = os.getenv("MIR_CARD")
 CRYPTO_ADDRESS = os.getenv("CRYPTO_ADDRESS")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
-client = Groq(api_key=GROQ_API_KEY)
+client = GroqClient(api_key=GROQ_API_KEY)
 
 # === Flask uptime ===
 app = Flask(__name__)
@@ -29,104 +29,87 @@ cursor = conn.cursor()
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY,
-    expiry TIMESTAMP
+    expires_at TEXT
 )
 """)
 conn.commit()
 
-def has_active_subscription(user_id):
-    cursor.execute("SELECT expiry FROM users WHERE user_id = ?", (user_id,))
+# === Subscriptions ===
+def has_access(user_id):
+    cursor.execute("SELECT expires_at FROM users WHERE user_id=?", (user_id,))
     result = cursor.fetchone()
     if result:
-        return datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S") > datetime.now()
+        expires_at = datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S")
+        return datetime.now() < expires_at
     return False
 
-def add_subscription(user_id, days):
-    expiry_date = datetime.now() + timedelta(days=days)
-    cursor.execute("REPLACE INTO users (user_id, expiry) VALUES (?, ?)",
-                   (user_id, expiry_date.strftime("%Y-%m-%d %H:%M:%S")))
+def grant_access(user_id, days):
+    expires_at = datetime.now() + timedelta(days=days)
+    cursor.execute("REPLACE INTO users (user_id, expires_at) VALUES (?, ?)", (user_id, expires_at.strftime("%Y-%m-%d %H:%M:%S")))
     conn.commit()
 
-def get_subscription_status(user_id):
-    cursor.execute("SELECT expiry FROM users WHERE user_id = ?", (user_id,))
-    result = cursor.fetchone()
-    if result:
-        expiry = datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S")
-        remaining = (expiry - datetime.now()).days
-        return f"â Subscription active.\nExpires in {remaining} day(s)."
-    return "â No active subscription."
-
+# === Commands ===
 @bot.message_handler(commands=['start'])
 def start(message):
-    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.row("ð Analyze Match", "ð³ Donate & Get Access", "ð Subscription Status")
-    bot.send_message(message.chat.id,
-                     "Welcome! Choose an option below:",
-                     reply_markup=markup)
+    bot.send_message(message.chat.id, "Welcome! Use the buttons below.", reply_markup=main_menu())
 
-@bot.message_handler(func=lambda m: m.text == "ð Subscription Status")
-def check_status(message):
-    status = get_subscription_status(message.from_user.id)
-    bot.send_message(message.chat.id, status)
+@bot.message_handler(commands=['status'])
+def status(message):
+    cursor.execute("SELECT expires_at FROM users WHERE user_id=?", (message.chat.id,))
+    result = cursor.fetchone()
+    if result:
+        expires = datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S")
+        days = (expires - datetime.now()).days
+        if days > 0:
+            bot.send_message(message.chat.id, f"✅ Subscription active.\nExpires in {days} day(s).")
+            return
+    bot.send_message(message.chat.id, "❌ No active subscription.")
 
-@bot.message_handler(func=lambda m: m.text == "ð³ Donate & Get Access")
+@bot.message_handler(func=lambda m: m.text == "📄 Donate & Get Access")
 def donate(message):
-    bot.send_message(message.chat.id, f"""To activate access, make a manual payment:
-ð³ MIR: `{MIR_CARD}`
-ð° Crypto: `{CRYPTO_ADDRESS}`
+    bot.send_message(message.chat.id, f"""
+Send any amount to one of the following:
 
-After payment, send a message: `Paid {message.from_user.id} 7` (or 30, 365).""", parse_mode="Markdown")
+💳 MIR card: `{MIR_CARD}`
+🪙 Crypto: `{CRYPTO_ADDRESS}`
 
-@bot.message_handler(regexp=r'^Paid (\d+) (\d+)$')
-def confirm_payment(message):
-    if message.from_user.id == ADMIN_ID:
-        try:
-            parts = message.text.split()
-            user_id = int(parts[1])
-            days = int(parts[2])
-            add_subscription(user_id, days)
-            bot.send_message(user_id, "â Access activated!")
-            bot.send_message(message.chat.id, "User activated.")
-        except:
-            bot.send_message(message.chat.id, "Error processing the command.")
+Then send your payment proof to the admin for access.
+""", parse_mode="Markdown")
 
-@bot.message_handler(func=lambda m: m.text == "ð Analyze Match")
-def analyze_prompt(message):
-    if not has_active_subscription(message.from_user.id):
-        bot.send_message(message.chat.id, "â Access denied.")
+@bot.message_handler(func=lambda m: m.text == "🔍 Analyze Match")
+def analyze(message):
+    if not has_access(message.chat.id):
+        bot.send_message(message.chat.id, "❌ Access denied.\nPlease purchase a subscription.")
         return
-    msg = bot.send_message(message.chat.id, "Send the match info:")
-    bot.register_next_step_handler(msg, analyze_match)
+    msg = bot.send_message(message.chat.id, "Send match details (e.g. Real Madrid vs Arsenal)")
+    bot.register_next_step_handler(msg, get_prediction)
 
-def analyze_match(message):
-    user_input = message.text.strip()
+# === Groq AI Call ===
+def get_prediction(message):
     prompt = f"""
-Ð¢Ñ ÑÐ¿Ð¾ÑÑÐ¸Ð²Ð½ÑÐ¹ Ð°Ð½Ð°Ð»Ð¸ÑÐ¸Ðº. ÐÑÐ¾Ð°Ð½Ð°Ð»Ð¸Ð·Ð¸ÑÑÐ¹ Ð¼Ð°ÑÑ Ð½Ð° Ð¾ÑÐ½Ð¾Ð²Ðµ Ð¾Ð¿Ð¸ÑÐ°Ð½Ð¸Ñ Ð¸ Ð²ÑÐ´Ð°Ð¹ ÐºÑÐ°ÑÐºÐ¸Ð¹ Ð¿ÑÐ¾Ð³Ð½Ð¾Ð· Ð² ÑÐ¾ÑÐ¼Ð°ÑÐµ:
+You are a betting AI. Reply with a short prediction in this format:
 
-â
-Match: [Ð½Ð°Ð·Ð²Ð°Ð½Ð¸Ðµ ÑÑÑÐ½Ð¸ÑÐ° Ð¸ Ð¼Ð°ÑÑ]
-â
-ÐÑÐ¾Ð³Ð½Ð¾Ð·:
-â¢ ÐÑÑÐ¾Ð´: [Ð1/Ð2/Ð½Ð¸ÑÑÑ]
-â¢ Ð¢Ð¾ÑÐ°Ð» Ð¼Ð°ÑÑÐ°: [Ð±Ð¾Ð»ÑÑÐµ/Ð¼ÐµÐ½ÑÑÐµ X.5]
-â¢ Ð¢Ð¾ÑÐ°Ð» Ð¿ÐµÑÐ²Ð¾Ð³Ð¾/Ð²ÑÐ¾ÑÐ¾Ð³Ð¾ ÑÐ°Ð¹Ð¼Ð°: [Ð±Ð¾Ð»ÑÑÐµ/Ð¼ÐµÐ½ÑÑÐµ X.5]
-â¢ Ð¢Ð¾ÑÐ°Ð» Ð¾Ð´Ð½Ð¾Ð¹ Ð¸Ð· ÐºÐ¾Ð¼Ð°Ð½Ð´: [Ð±Ð¾Ð»ÑÑÐµ/Ð¼ÐµÐ½ÑÑÐµ X.5]
-â¢ ÐÐµÑÐ´Ð¸ÐºÑ: [ÑÐµÐ·ÑÐ»ÑÑÐ°Ñ]
+Match: Лига чемпионов — {message.text}  
+Ответный матч, первая игра закончилась 0:3 в пользу Арсенала.  
+Матч пройдет на Сантьяго Бернабеу, Мадрид.
 
-ÐÐ¾Ñ Ð¾Ð¿Ð¸ÑÐ°Ð½Ð¸Ðµ Ð¼Ð°ÑÑÐ°: {user_input}
-    """
-    try:
-        response = client.chat.completions.create(
-            model="mixtral-8x7b-32768",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            temperature=1.0
-        )
-        answer = response.choices[0].message.content
-        bot.send_message(message.chat.id, answer)
-    except Exception as e:
-        bot.send_message(message.chat.id, "Error occurred during analysis.")
-        print(e)
+Прогноз:
 
-bot.polling()
+• Основная ставка: Победа одной команды / Ничья  
+• Уверенность: Низкая / Средняя / Высокая  
+• Дополнительная Ставка: Тотал матча / Тотал 1-го или 2-го тайма / Тотал одной из команд
+"""
+    response = client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        model="mixtral-8x7b-32768"
+    )
+    bot.send_message(message.chat.id, response.choices[0].message.content.strip())
+
+# === Buttons ===
+def main_menu():
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.row("🔍 Analyze Match", "📄 Donate & Get Access")
+    markup.row("📊 Subscription Status")
+    return markup
+
+bot.infinity_polling()
