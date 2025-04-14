@@ -2,7 +2,7 @@ import telebot
 import sqlite3
 from flask import Flask
 from threading import Thread
-from groq import Groq
+from groq import GroqClient
 import os
 from datetime import datetime, timedelta
 
